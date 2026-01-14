@@ -1,15 +1,17 @@
+from flask import Flask, render_template
+from src.transcript_cleaner.routes import transcript_cleaner_bp
 import os
 
-from flask import Flask, send_file
+app = Flask(__name__, template_folder='src/templates', static_folder='src/static')
 
-app = Flask(__name__)
+# Secret key for flashing messages
+app.secret_key = os.urandom(24)
 
-@app.route("/")
+@app.route('/')
 def index():
-    return send_file('src/index.html')
+    return render_template('index.html')
 
-def main():
-    app.run(port=int(os.environ.get('PORT', 80)))
+app.register_blueprint(transcript_cleaner_bp)
 
-if __name__ == "__main__":
-    main()
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=8080)

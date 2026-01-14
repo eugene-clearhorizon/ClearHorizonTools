@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Internal Tools</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Internal Apps</h1>
+            <p>A collection of tools to streamline your workflow.</p>
+        </div>
+
+        <div class="tool-grid">
+            <a href="{{ url_for('transcript_cleaner.transcript_cleaner') }}" class="tool-card">
+                <h3>Teams Transcript Cleaner</h3>
+                <p>Cleans and formats downloaded Microsoft Teams transcript files (.vtt) into a readable Word document.</p>
+            </a>
+            <div class="placeholder-card">
+                <p>More tools coming soon...</p>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
