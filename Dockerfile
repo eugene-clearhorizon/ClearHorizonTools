@@ -13,5 +13,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy the rest of the application's code to the working directory
 COPY . .
 
-# Command to run the application using Gunicorn
-CMD ["gunicorn", "-w", "4", "-b", "0.0.0.0:8080", "main:app"]
+# Make port 8080 available to the world outside this container
+# And tell gunicorn to run on a variable port
+ENV PORT 8080
+CMD exec gunicorn -w 4 -b "0.0.0.0:$PORT" main:app
