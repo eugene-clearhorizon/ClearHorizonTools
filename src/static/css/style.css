@@ -30,6 +30,15 @@ body {
     color: #6c757d;
 }
 
+.version-meta {
+    position: fixed;
+    right: 1rem;
+    bottom: 1rem;
+    margin: 0;
+    font-size: 0.75rem;
+    color: #6c757d;
+}
+
 .tool-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));

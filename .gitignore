@@ -7,7 +7,3 @@ __pycache__/
 
 # IDE-specific
 .idx/
-
-# Firebase
-firebase-debug.log
-firebase-debug.*.log
