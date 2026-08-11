@@ -1,24 +1,35 @@
 from flask import Blueprint, render_template, request, send_from_directory, after_this_request, flash
 from werkzeug.utils import secure_filename
 import os
+import uuid
 import zipfile
+import shutil
 from .utils import process_vtt_to_docx
+from src.auth.utils import login_required
 
 transcript_cleaner_bp = Blueprint('transcript_cleaner', __name__, template_folder='../templates')
 
-UPLOAD_FOLDER = 'uploads'
-OUTPUT_FOLDER = 'output'
+BASE_UPLOAD_FOLDER = 'uploads'
+BASE_OUTPUT_FOLDER = 'output'
 
 @transcript_cleaner_bp.route('/transcript-cleaner', methods=['GET', 'POST'])
+@login_required
 def transcript_cleaner():
-    if not os.path.exists(UPLOAD_FOLDER):
-        os.makedirs(UPLOAD_FOLDER)
-    if not os.path.exists(OUTPUT_FOLDER):
-        os.makedirs(OUTPUT_FOLDER)
-
     if request.method == 'POST':
+        request_id = str(uuid.uuid4())
+        upload_dir = os.path.join(BASE_UPLOAD_FOLDER, request_id)
+        output_dir = os.path.join(BASE_OUTPUT_FOLDER, request_id)
+        os.makedirs(upload_dir, exist_ok=True)
+        os.makedirs(output_dir, exist_ok=True)
+
+        @after_this_request
+        def cleanup(response):
+            shutil.rmtree(upload_dir, ignore_errors=True)
+            shutil.rmtree(output_dir, ignore_errors=True)
+            return response
+
         files = request.files.getlist('files[]')
-        
+
         invalid_files = []
         valid_files = []
         for file in files:
@@ -33,50 +44,40 @@ def transcript_cleaner():
             for filename in invalid_files:
                 flash(f'Invalid file type: "{filename}". Only .vtt files are accepted.', 'error')
             return render_template('transcript_cleaner.html')
-        
+
         if not valid_files:
             flash('No files were selected. Please upload one or more .vtt files.', 'warning')
             return render_template('transcript_cleaner.html')
 
         output_paths = []
-        upload_paths = []
 
         for file in valid_files:
             filename = secure_filename(file.filename)
-            filepath = os.path.join(UPLOAD_FOLDER, filename)
+            filepath = os.path.join(upload_dir, filename)
             file.save(filepath)
-            upload_paths.append(filepath)
 
             output_filename = f"cleaned_{os.path.splitext(filename)[0]}.docx"
-            output_filepath = os.path.join(OUTPUT_FOLDER, output_filename)
+            output_filepath = os.path.join(output_dir, output_filename)
             output_paths.append(output_filepath)
 
             process_vtt_to_docx(filepath, output_filepath)
 
-        @after_this_request
-        def cleanup(response):
-            for path in upload_paths + output_paths:
-                try:
-                    os.remove(path)
-                except Exception as e:
-                    print(f"Error cleaning up file: {e}")
-            
-            if len(output_paths) > 1:
-                try:
-                    os.remove(os.path.join(OUTPUT_FOLDER, "cleaned_transcripts.zip"))
-                except Exception as e:
-                    print(f"Error cleaning up zip file: {e}")
-
-            return response
-
         if len(output_paths) == 1:
-            return send_from_directory(os.path.dirname(output_paths[0]), os.path.basename(output_paths[0]), as_attachment=True)
+            return send_from_directory(
+                os.path.abspath(output_dir),
+                os.path.basename(output_paths[0]),
+                as_attachment=True
+            )
         else:
             zip_filename = "cleaned_transcripts.zip"
-            zip_filepath = os.path.join(OUTPUT_FOLDER, zip_filename)
+            zip_filepath = os.path.join(output_dir, zip_filename)
             with zipfile.ZipFile(zip_filepath, 'w') as zipf:
                 for path in output_paths:
                     zipf.write(path, os.path.basename(path))
-            return send_from_directory(OUTPUT_FOLDER, zip_filename, as_attachment=True)
+            return send_from_directory(
+                os.path.abspath(output_dir),
+                zip_filename,
+                as_attachment=True
+            )
 
     return render_template('transcript_cleaner.html')

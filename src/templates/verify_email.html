@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+
+{% block title %}Verify Email — Internal Tools{% endblock %}
+
+{% block header %}
+<div class="header">
+    <h1>Verify Your Email</h1>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="auth-form">
+    <p>A verification email has been sent to your address. Please check your inbox (and spam folder) and click the link to verify.</p>
+    <p>Once verified, click below to continue.</p>
+    <div id="error-message" class="flash error" style="display:none;"></div>
+    <button class="btn btn-block" id="continue-btn">I've verified — continue</button>
+    <p class="auth-footer"><a href="#" id="resend-link">Resend verification email</a></p>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{% include 'partials/firebase_init.html' %}
+<script>
+    document.getElementById('continue-btn').addEventListener('click', async () => {
+        const errorDiv = document.getElementById('error-message');
+        const btn = document.getElementById('continue-btn');
+        errorDiv.style.display = 'none';
+        btn.disabled = true;
+        btn.textContent = 'Checking...';
+
+        const user = firebase.auth().currentUser;
+        if (!user) {
+            // User opened the verification link in a different tab — send them to login
+            window.location.href = "{{ url_for('auth.login') }}";
+            return;
+        }
+
+        try {
+            // Force-refresh so the token reflects the current email_verified state
+            const idToken = await user.getIdToken(true);
+            const response = await fetch('/auth/check-verification', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({idToken})
+            });
+            const data = await response.json();
+
+            if (response.ok) {
+                window.location.href = data.redirect;
+            } else {
+                throw new Error(data.error || 'Verification check failed.');
+            }
+        } catch (err) {
+            errorDiv.textContent = err.message;
+            errorDiv.style.display = 'block';
+            btn.disabled = false;
+            btn.textContent = "I've verified — continue";
+        }
+    });
+
+    document.getElementById('resend-link').addEventListener('click', async (e) => {
+        e.preventDefault();
+        const user = firebase.auth().currentUser;
+        if (user) {
+            await user.sendEmailVerification();
+            alert('Verification email resent. Please check your inbox.');
+        } else {
+            window.location.href = "{{ url_for('auth.login') }}";
+        }
+    });
+</script>
+{% endblock %}

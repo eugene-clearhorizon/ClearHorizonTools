@@ -23,7 +23,9 @@ def process_vtt_to_docx(file, output_filename):
     doc.add_paragraph(f"Speakers: {'; '.join(sorted(speaker_names))}")
     doc.add_paragraph("")
     
-    unwanted_words = {'', 'Yeah.', 'Mm.', 'Mhm.' , 'Mmh.','Hmm. Mm hmm mm hmm.','Mm-hmm. Mm-hmm.','Mmhmm.' ,'Mhm, mhm.','Mm-hmm. Hmm.', 'Mm hmm mm hmm.', 'Mm hmm. Mm hmm.', 'Mm hmm mm hmm. Mm hmm.', 'Uh-huh.', 'Yeah. And so.', 'OK. Yeah, yeah.', 'Umm.', 'Yeah, yeah.', 'Awesome.', 
+    unwanted_words = {'', 'Yeah.', 'Mm.', 'Mhm.', 'Mmh.','Hmm. Mm hmm mm hmm.','Mm-hmm. Mm-hmm.','Mmhmm.' ,'Mhm, mhm.','Mm-hmm. Hmm.', 
+                      'Mm hmm mm hmm.', 'Mm hmm. Mm hmm.', 'Mm hmm mm hmm. Mm hmm.', 'Uh-huh.', 'Yeah. And so.', 'OK. Yeah, yeah.', 'Umm.', 
+                      'Yeah, yeah.', 'Awesome.',
                        'Mm-hmm.', 'Mm-hmm. Mm-hmm.',  'OK.', 'Right.', 'Right?', 'OK. Yeah.', 'So.', 'Uh.', 'Hmm.', 'Hmm yeah.', 'OK, cool.', 
                       'Yeah, cool.', 'Ohh.', 'Um', 'Um?', 'Um.', 'Umm?', 'Cool.', 'Mm-hmm.', 'Mm hmm.', 'Huh.', 
                       'Ohh uh-huh.', 'Hmm. MMM.', 'Yeah. Wow.', 'Ohh wow wow.', 'Um.', 'Uh huh.', 'MMM.', 'K.', 'Oh. OK.', 'Oh. OK. ','Mim.' }

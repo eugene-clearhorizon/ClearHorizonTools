@@ -1,0 +1,131 @@
+{% extends "base.html" %}
+
+{% block title %}Sign In — Internal Tools{% endblock %}
+
+{% block header %}
+<div class="header">
+    <h1>Sign In</h1>
+    <p>Clear Horizon staff only.</p>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="auth-form" id="login-section">
+    <div id="error-message" class="flash error" style="display:none;"></div>
+    <form id="login-form">
+        <div class="form-group">
+            <label for="email">Email</label>
+            <input type="email" id="email" name="email" required autocomplete="email">
+        </div>
+        <div class="form-group">
+            <label for="password">Password</label>
+            <input type="password" id="password" name="password" required autocomplete="current-password">
+        </div>
+        <button type="submit" class="btn" id="submit-btn">Sign In</button>
+    </form>
+    <p class="auth-footer">Don't have an account? <a href="{{ url_for('auth.signup') }}">Sign up</a></p>
+    <p class="auth-footer"><a href="#" id="forgot-link">Forgot your password?</a></p>
+</div>
+
+<div class="auth-form" id="forgot-section" style="display:none;">
+    <h2>Reset your password</h2>
+    <div id="forgot-error" class="flash error" style="display:none;"></div>
+    <div id="forgot-success" class="flash success" style="display:none;"></div>
+    <form id="forgot-form">
+        <div class="form-group">
+            <label for="forgot-email">Email</label>
+            <input type="email" id="forgot-email" required autocomplete="email">
+        </div>
+        <button type="submit" class="btn" id="forgot-btn">Send reset link</button>
+    </form>
+    <p class="auth-footer"><a href="#" id="back-to-login">Back to sign in</a></p>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{% include 'partials/firebase_init.html' %}
+<script>
+    document.getElementById('login-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const email = document.getElementById('email').value;
+        const password = document.getElementById('password').value;
+        const errorDiv = document.getElementById('error-message');
+        const submitBtn = document.getElementById('submit-btn');
+
+        errorDiv.style.display = 'none';
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Signing in...';
+
+        try {
+            const userCredential = await firebase.auth().signInWithEmailAndPassword(email, password);
+            const idToken = await userCredential.user.getIdToken();
+
+            const response = await fetch('/auth/session', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({idToken})
+            });
+            const data = await response.json();
+
+            if (response.ok) {
+                window.location.href = data.redirect;
+            } else if (data.error === 'email_not_verified') {
+                window.location.href = data.redirect;
+            } else {
+                throw new Error(data.error || 'Sign in failed.');
+            }
+        } catch (err) {
+            let message = err.message;
+            if (['auth/user-not-found', 'auth/wrong-password', 'auth/invalid-credential'].includes(err.code)) {
+                message = 'Incorrect email or password.';
+            } else if (err.code === 'auth/too-many-requests') {
+                message = 'Too many failed attempts. Try again later.';
+            }
+            errorDiv.textContent = message;
+            errorDiv.style.display = 'block';
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Sign In';
+        }
+    });
+
+    document.getElementById('forgot-link').addEventListener('click', e => {
+        e.preventDefault();
+        const emailVal = document.getElementById('email').value;
+        if (emailVal) document.getElementById('forgot-email').value = emailVal;
+        document.getElementById('login-section').style.display = 'none';
+        document.getElementById('forgot-section').style.display = 'block';
+    });
+
+    document.getElementById('back-to-login').addEventListener('click', e => {
+        e.preventDefault();
+        document.getElementById('forgot-section').style.display = 'none';
+        document.getElementById('login-section').style.display = 'block';
+    });
+
+    document.getElementById('forgot-form').addEventListener('submit', async e => {
+        e.preventDefault();
+        const email = document.getElementById('forgot-email').value;
+        const errorDiv = document.getElementById('forgot-error');
+        const successDiv = document.getElementById('forgot-success');
+        const btn = document.getElementById('forgot-btn');
+
+        errorDiv.style.display = 'none';
+        successDiv.style.display = 'none';
+        btn.disabled = true;
+        btn.textContent = 'Sending...';
+
+        try {
+            await firebase.auth().sendPasswordResetEmail(email);
+            successDiv.textContent = 'Reset link sent. Check your inbox.';
+            successDiv.style.display = 'block';
+        } catch (err) {
+            // Don't reveal whether the email exists — show success regardless
+            successDiv.textContent = 'If that address is registered, a reset link has been sent.';
+            successDiv.style.display = 'block';
+        } finally {
+            btn.disabled = false;
+            btn.textContent = 'Send reset link';
+        }
+    });
+</script>
+{% endblock %}

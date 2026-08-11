@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+
+{% block title %}Email Verification — Internal Tools{% endblock %}
+
+{% block header %}
+<div class="header">
+    <h1>Email Verification</h1>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="auth-form">
+    <div class="js-state" id="state-loading">
+        <p>Verifying your email address&hellip;</p>
+    </div>
+    <div class="js-state" id="state-success" style="display:none;">
+        <div class="flash success">Your email has been verified.</div>
+        <a href="{{ url_for('auth.login') }}" class="btn btn-block">Sign in</a>
+    </div>
+    <div class="js-state" id="state-already-verified" style="display:none;">
+        <div class="flash success">Your email is already verified.</div>
+        <a href="{{ url_for('auth.login') }}" class="btn btn-block">Sign in</a>
+    </div>
+    <div class="js-state" id="state-error" style="display:none;">
+        <div class="flash error" id="error-message"></div>
+        <p>Need a new verification link? <a href="{{ url_for('auth.login') }}">Sign in</a> and we&rsquo;ll send another.</p>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{% include 'partials/firebase_init.html' %}
+<script>
+    const params = new URLSearchParams(window.location.search);
+    const mode = params.get('mode');
+    const oobCode = params.get('oobCode');
+
+    if (mode !== 'verifyEmail' || !oobCode) {
+        window.location.href = "{{ url_for('auth.login') }}";
+    } else {
+        firebase.auth().applyActionCode(oobCode)
+            .then(() => showState('state-success'))
+            .catch(err => {
+                if (err.code === 'auth/invalid-action-code') {
+                    // Link already used — check if the current user is actually verified
+                    const user = firebase.auth().currentUser;
+                    if (user) {
+                        user.reload().then(() => {
+                            showState(firebase.auth().currentUser.emailVerified
+                                ? 'state-already-verified'
+                                : 'state-error');
+                            document.getElementById('error-message').textContent =
+                                'This verification link has expired. Please request a new one.';
+                        });
+                    } else {
+                        // No active session — most likely the link was already used successfully
+                        showState('state-already-verified');
+                    }
+                } else {
+                    showState('state-error');
+                    document.getElementById('error-message').textContent =
+                        'Verification failed: ' + (err.message || 'unknown error');
+                }
+            });
+    }
+</script>
+{% endblock %}

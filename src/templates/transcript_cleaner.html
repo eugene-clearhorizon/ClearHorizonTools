@@ -1,32 +1,23 @@
-<!doctype html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>Teams Transcript Cleaner</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
-</head>
-<body>
-    <div class="container">
-        <div class="app-header">
-            <h1>Teams Transcript Cleaner</h1>
-            <a href="{{ url_for('index') }}">Back to tools</a>
-        </div>
+{% extends "base.html" %}
 
-        {% with messages = get_flashed_messages(with_categories=true) %}
-            {% if messages %}
-                {% for category, message in messages %}
-                <div class="flash {{ category }}">{{ message }}</div>
-                {% endfor %}
-            {% endif %}
-        {% endwith %}
+{% block title %}Teams Transcript Cleaner{% endblock %}
 
-        <div class="upload-area">
-            <p>Upload one or more Microsoft Teams transcript files (.vtt) to clean them up and convert them to a Word document (.docx).</p>
-            <form method=post enctype=multipart/form-data>
-                <input type=file name=files[] multiple>
-                <input type=submit value="Clean Transcripts" class="btn">
-            </form>
-        </div>
+{% block header %}
+<div class="app-header">
+    <h1>Teams Transcript Cleaner</h1>
+    <div class="app-header-actions">
+        <a href="{{ url_for('index') }}">Back to tools</a>
+        {% include 'partials/sign_out.html' %}
     </div>
-</body>
-</html>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="upload-area">
+    <p>Upload one or more Microsoft Teams transcript files (.vtt) to clean them up and convert them to a Word document (.docx).</p>
+    <form method="post" enctype="multipart/form-data">
+        <input type="file" name="files[]" multiple>
+        <input type="submit" value="Clean Transcripts" class="btn">
+    </form>
+</div>
+{% endblock %}

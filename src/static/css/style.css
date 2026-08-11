@@ -103,6 +103,12 @@ body {
     text-decoration: underline;
 }
 
+.app-header-actions {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+}
+
 .upload-area {
     background: #ffffff;
     border: 2px dashed #dee2e6;
@@ -132,6 +138,18 @@ body {
     background-color: #0056b3;
 }
 
+.btn-sm {
+    font-size: 0.85rem;
+    padding: 0.4rem 0.9rem;
+}
+
+.btn-block {
+    display: block;
+    width: 100%;
+    text-align: center;
+    box-sizing: border-box;
+}
+
 .flash {
     width: 100%;
     padding: 1rem;
@@ -150,4 +168,92 @@ body {
     background-color: #fff3cd;
     color: #856404;
     border: 1px solid #ffeeba;
+}
+
+.flash.success {
+    background-color: #d4edda;
+    color: #155724;
+    border: 1px solid #c3e6cb;
+}
+
+.auth-form {
+    background: #ffffff;
+    border-radius: 8px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+    padding: 2rem;
+    max-width: 400px;
+    margin: 0 auto;
+}
+
+.auth-form h2 {
+    margin: 0 0 1rem 0;
+    font-size: 1.1rem;
+}
+
+.form-group {
+    margin-bottom: 1rem;
+}
+
+.form-note {
+    margin: 0 0 1rem 0;
+    color: #6c757d;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 0.4rem;
+    font-weight: 500;
+    color: #212529;
+}
+
+.form-group input {
+    width: 100%;
+    padding: 0.6rem 0.75rem;
+    border: 1px solid #dee2e6;
+    border-radius: 4px;
+    font-size: 1rem;
+    box-sizing: border-box;
+    transition: border-color 0.15s;
+}
+
+.form-group input:focus {
+    outline: none;
+    border-color: #007bff;
+    box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.15);
+}
+
+.auth-form .btn {
+    width: 100%;
+    margin-top: 0.5rem;
+}
+
+.auth-form .btn:disabled {
+    background-color: #6c757d;
+    cursor: not-allowed;
+}
+
+.auth-footer {
+    text-align: center;
+    margin-top: 1.25rem;
+    color: #6c757d;
+    font-size: 0.95rem;
+}
+
+.auth-footer a {
+    color: #007bff;
+    text-decoration: none;
+}
+
+.auth-footer a:hover {
+    text-decoration: underline;
+}
+
+.sign-out-btn {
+    position: fixed;
+    top: 1rem;
+    right: 1rem;
+}
+
+.sign-out-form {
+    margin: 0;
 }
