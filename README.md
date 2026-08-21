@@ -65,22 +65,58 @@ generating the service account key — is a separate one-time job. See
 ## Hosting and ownership
 
 Worth knowing before you rely on this: both the Google Cloud project and the Firebase
-project sit under **Eugene Liston's personal Google Cloud account**, and deployment runs
+project sit under **Eugene Liston's Google Cloud account**, and deployment runs
 on those credentials. It is not currently a Clear Horizon–owned asset.
 
 Everything is running within the free tier, so there's no cost attached at present. The
-practical risk is access rather than money — nobody else can deploy, change environment
+practical risk is access - nobody else can deploy, change environment
 variables, read the logs, or manage user accounts.
 
-Moving it to a Clear Horizon–owned account is doable but is a migration, not a settings
-change. It would mean a new Google Cloud project and a new Firebase project under a Clear
-Horizon billing account, a fresh service account key and set of environment variables, and
-a redeploy. Two consequences are easy to overlook:
+### It spans two Google Cloud projects
+
+This is the surprising part, and the thing most likely to cause confusion later. The app
+and its authentication live in **different projects**:
+
+| What | Project ID | Project number |
+|---|---|---|
+| Cloud Run — the running app | `evaluation-tools` | 355908014212 |
+| Firebase — user accounts and auth | `clear-horizon-tools` | 616027330373 |
+
+The `355908014212` in the live URL is `evaluation-tools`, a project whose name suggests it
+started as a scratch space rather than somewhere production was meant to end up.
+
+Nothing is broken by this — the app authenticates against `clear-horizon-tools` using the
+service account key in `FIREBASE_CREDENTIALS_JSON`, and Cloud Run is only hosting it. But
+it means the two halves are administered separately, and any advice that assumes a single
+project (including step 1 of [FIREBASE_SETUP.md](FIREBASE_SETUP.md), which tells you to
+check they match) doesn't apply here.
+
+Two related things worth knowing:
+
+- **`deploy.ps1` has no project pinned.** It deploys to whatever `gcloud config get-value
+  project` currently returns. That happens to be `evaluation-tools` today, so deploys land
+  correctly — but it's a machine-local setting, not a property of this repo. If you switch
+  projects for unrelated work, your next deploy goes somewhere else without warning. Pass
+  `-ProjectId evaluation-tools` explicitly if you want to be certain.
+- **There's an older service still deployed.** `clear-horizon-tools` hosts a separate Cloud
+  Run service called `transcript-cleaner`, left over from before the app was restructured.
+  It isn't what the live URL points at. Worth checking whether anyone still uses that link
+  before deleting it.
+
+### Moving it to Clear Horizon
+
+Doable, but it's a migration rather than a settings change. It would mean a new Google
+Cloud project and a new Firebase project under a Clear Horizon billing account, a fresh
+service account key and set of environment variables, and a redeploy. Three consequences
+are easy to overlook:
 
 - The live URL changes, and the new domain has to be added to Firebase's authorised
   domains before sign-in will work.
 - User accounts live inside the Firebase project, so everyone would need to sign up again
   on the new one unless the existing users are explicitly exported and imported.
+- Because hosting and auth are currently split across two projects, both need replacing —
+  it's easy to move the Cloud Run service and leave authentication pointing at an account
+  nobody at Clear Horizon controls.
 
 ## Deploying
 
