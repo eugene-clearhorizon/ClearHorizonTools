@@ -33,10 +33,11 @@ if (-not $ProjectId -or [string]::IsNullOrWhiteSpace($ProjectId)) {
 
 Write-Host "Deploying service '$Service' to project '$ProjectId' in region '$Region'..."
 
-& $gcloudCommand config set project $ProjectId | Out-Null
-
+# Pass --project per command rather than `gcloud config set project`, which would
+# permanently repoint the caller's gcloud installation as a side effect of deploying.
 & $gcloudCommand run deploy $Service `
     --source . `
+    --project $ProjectId `
     --region $Region `
     --allow-unauthenticated
 
@@ -45,6 +46,7 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 $url = & $gcloudCommand run services describe $Service `
+    --project $ProjectId `
     --region $Region `
     --format "value(status.url)"
 

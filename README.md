@@ -91,17 +91,24 @@ it means the two halves are administered separately, and any advice that assumes
 project (including step 1 of [FIREBASE_SETUP.md](FIREBASE_SETUP.md), which tells you to
 check they match) doesn't apply here.
 
-Two related things worth knowing:
+**You will not find any of this in the code.** No project ID is hardcoded anywhere in
+`main.py`, `src/`, or the `Dockerfile` — the app takes whatever `FIREBASE_PROJECT_ID` and
+credentials it is given at runtime and is otherwise project-agnostic. The split exists
+only in infrastructure and in the environment variables set on the Cloud Run service:
 
-- **`deploy.ps1` has no project pinned.** It deploys to whatever `gcloud config get-value
-  project` currently returns. That happens to be `evaluation-tools` today, so deploys land
-  correctly — but it's a machine-local setting, not a property of this repo. If you switch
-  projects for unrelated work, your next deploy goes somewhere else without warning. Pass
-  `-ProjectId evaluation-tools` explicitly if you want to be certain.
-- **There's an older service still deployed.** `clear-horizon-tools` hosts a separate Cloud
-  Run service called `transcript-cleaner`, left over from before the app was restructured.
-  It isn't what the live URL points at. Worth checking whether anyone still uses that link
-  before deleting it.
+```
+hosted in            evaluation-tools
+FIREBASE_PROJECT_ID  clear-horizon-tools
+```
+
+So a container running in one project authenticates against a Firebase project in
+another, bridged by the service account key. Reading the source will not reveal it, which
+is exactly why it is written down here.
+
+Also worth knowing: `deploy.ps1` has no project pinned, and falls back to whatever
+`gcloud config get-value project` returns. That is a machine-local setting rather than a
+property of this repo, so pass `-ProjectId evaluation-tools` explicitly to be certain
+where a manual deploy lands.
 
 ### Moving it to Clear Horizon
 
@@ -120,28 +127,70 @@ are easy to overlook:
 
 ## Deploying
 
-The app runs on Google Cloud Run in `australia-southeast2`. From the project root:
+**Pushing to `main` deploys to production.** A Cloud Build trigger watches this repo and
+rebuilds the Cloud Run service on every push to `main`. There is no approval step, so a
+merge to `main` goes live within a few minutes.
+
+That is the reason to do real work on a branch. A branch can be pushed freely; `main`
+cannot.
+
+| | |
+|---|---|
+| Trigger | build and deploy on push to `^main$` |
+| Project | `evaluation-tools` |
+| Service | `clearhorizontools` in `australia-southeast2` |
+| Build config | **inline YAML stored in the trigger, not in this repo** |
+
+That last row is worth knowing: the build steps live only in the Cloud Console
+(Cloud Build → Triggers → Edit), so they are not version-controlled and you will not find
+them by reading this repository.
+
+To watch a deploy or find out why one failed:
 
 ```powershell
-.\deploy.ps1
+gcloud builds list --project evaluation-tools --limit 5
+gcloud builds log <BUILD_ID> --project evaluation-tools
 ```
 
-The script picks up whichever project `gcloud` is currently pointed at; pass
-`-ProjectId <PROJECT_ID>` to override it. It builds from the `Dockerfile`, deploys, and
-prints the service URL when it's done.
+### Deploying by hand
 
-If you'd rather do it by hand:
+`deploy.ps1` does the same job from your working directory instead of from GitHub. You
+rarely need it — it is useful for testing a change without committing, or if the trigger
+is broken.
 
 ```powershell
-gcloud run deploy clearhorizontools --source . --region australia-southeast2 --allow-unauthenticated
+.\deploy.ps1 -ProjectId evaluation-tools
 ```
+
+Pass `-ProjectId` explicitly. Without it the script deploys to whatever `gcloud config
+get-value project` currently returns, which is a machine-local setting and can drift.
+
+Note this uploads your working directory, not your last commit — including uncommitted
+changes. `.gcloudignore` keeps `.env` and the service account key out of the upload.
+
+### Rolling back
+
+Every deploy creates a numbered revision and old ones are kept, so rolling back is
+instant and needs no rebuild:
+
+```powershell
+gcloud run revisions list --service clearhorizontools --project evaluation-tools --region australia-southeast2
+gcloud run services update-traffic clearhorizontools `
+  --project evaluation-tools --region australia-southeast2 `
+  --to-revisions <REVISION_NAME>=100
+```
+
+Check the creation timestamps rather than assuming the highest number is the safe one —
+the newest revision is the deploy you are trying to undo.
+
+### Environment variables
 
 Cloud Run keeps its own copy of the environment variables — `.env` is not uploaded. To
 change them:
 
 ```powershell
 gcloud run services update clearhorizontools `
-  --region australia-southeast2 `
+  --project evaluation-tools --region australia-southeast2 `
   --set-env-vars "SECRET_KEY=...,FIREBASE_API_KEY=...,FIREBASE_AUTH_DOMAIN=...,FIREBASE_PROJECT_ID=..."
 ```
 

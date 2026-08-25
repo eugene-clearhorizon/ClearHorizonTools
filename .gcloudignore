@@ -1,0 +1,19 @@
+# Files NOT uploaded to Cloud Build when deploying with `gcloud run deploy --source .`
+# Same syntax as .gitignore. Without this file gcloud generates its own default,
+# and the exact behaviour around .gitignore is version-dependent — so be explicit.
+
+# Secrets — Cloud Run reads env vars from the service config, never from these
+.env
+*firebase-adminsdk*.json
+
+# Local-only
+.venv/
+__pycache__/
+*.pyc
+.git/
+.gitignore
+.claude/
+
+# Runtime scratch dirs (recreated per request)
+uploads/
+output/
