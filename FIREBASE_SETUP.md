@@ -67,6 +67,37 @@ sign-in page, silently discarding the code in the link.
 Check the link in a real email if you're unsure it's right. The console's template preview
 shows placeholder values (`mode=action&oobCode=code`), not what actually gets sent.
 
+### This setting is currently stuck, and the app works around it
+
+As of August 2026 the action URL on `clear-horizon-tools` **cannot be changed**. It still
+reads:
+
+```
+https://clearhorizontools-355908014212.australia-southeast2.run.app/auth/reset-action
+```
+
+The console fails with "An error occurred updating action URL", and the underlying
+Identity Platform API gives the real reason — a PATCH of
+`notification.sendEmail.callbackUri` returns:
+
+```
+400 EMAIL_TEMPLATE_UPDATE_NOT_ALLOWED
+```
+
+This is not a permissions problem: the account holds `roles/owner`, the domain is already
+in Authorized Domains, and reading the config works. Re-submitting the *existing* value
+succeeds, so only a change to the value is refused. Whether that is an anti-abuse lock on
+this project or something else is not publicly documented; Firebase Support is the route
+if it ever needs to be corrected properly.
+
+**The app does not depend on fixing it.** `/auth/reset-action` and `/auth/verify-action`
+redirect to `/auth/action` with the query string intact, so verification links work as
+sent. Those two routes in `src/auth/routes.py` are therefore load-bearing — deleting them
+as dead legacy code would silently break email verification again.
+
+If the action URL ever does become editable, point it at `/auth/action` and the redirects
+can be retired.
+
 ## 5. Generate a service account key
 
 Firebase Console → Project Settings → Service Accounts → **Generate new private key**.

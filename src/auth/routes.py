@@ -140,9 +140,17 @@ def _redirect_to_action():
     return redirect(url_for('auth.action', **request.args.to_dict(flat=True)))
 
 
-# The action URL used to point at one of these two, which meant links for the
-# other mode were silently bounced to the sign-in page. They are kept only so
-# that links already sitting in people's inboxes continue to work.
+# DO NOT DELETE THESE. They are load-bearing, not legacy compatibility.
+#
+# The Firebase action URL still points at /auth/reset-action and could not be
+# changed: the Identity Platform API rejects an update to notification.sendEmail
+# .callbackUri with EMAIL_TEMPLATE_UPDATE_NOT_ALLOWED, and the console fails with
+# a generic error for the same reason. So every verification email Firebase sends
+# today arrives at /auth/reset-action?mode=verifyEmail, and this redirect is the
+# only thing that gets it to a handler that will honour it.
+#
+# Removing either route silently breaks email verification again. If the callback
+# URL is ever successfully repointed at /auth/action, these can go.
 @auth_bp.route('/verify-action', methods=['GET'])
 def verify_action():
     return _redirect_to_action()
