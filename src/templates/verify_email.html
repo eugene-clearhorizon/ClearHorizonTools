@@ -10,9 +10,20 @@
 
 {% block content %}
 <div class="auth-form">
-    <p>A verification email has been sent to your address. Please check your inbox (and spam folder) and click the link to verify.</p>
-    <p>Once verified, click below to continue.</p>
+    <div id="sent-message">
+        <p>A verification email has been sent to your address. Please check your inbox (and spam folder) and click the link to verify.</p>
+        <p>Once verified, click below to continue.</p>
+    </div>
+    <div id="send-failed" style="display:none;">
+        <div class="flash error">
+            Your account was created, but we couldn&rsquo;t send the verification email.
+            Nothing has arrived in your inbox &mdash; there is no point waiting for it.
+        </div>
+        <p>Try &ldquo;Resend&rdquo; below. If that fails too, the problem is at our end: contact IT
+        and mention that the verification email could not be sent.</p>
+    </div>
     <div id="error-message" class="flash error" style="display:none;"></div>
+    <div id="resend-status" style="display:none;"></div>
     <button class="btn btn-block" id="continue-btn">I've verified — continue</button>
     <p class="auth-footer"><a href="#" id="resend-link">Resend verification email</a></p>
 </div>
@@ -21,6 +32,26 @@
 {% block scripts %}
 {% include 'partials/firebase_init.html' %}
 <script>
+    const LOGIN_URL = "{{ url_for('auth.login') }}";
+
+    // signup.html redirects here with ?send=failed when Firebase accepted the new
+    // account but refused to send the email. Telling someone to check an inbox that
+    // was never written to is the failure mode this whole page exists to avoid.
+    if (new URLSearchParams(window.location.search).get('send') === 'failed') {
+        document.getElementById('sent-message').style.display = 'none';
+        document.getElementById('send-failed').style.display = 'block';
+    }
+
+    function showResendStatus(message, isError) {
+        const status = document.getElementById('resend-status');
+        status.innerHTML = '';
+        const flash = document.createElement('div');
+        flash.className = isError ? 'flash error' : 'flash success';
+        flash.textContent = message;
+        status.appendChild(flash);
+        status.style.display = 'block';
+    }
+
     document.getElementById('continue-btn').addEventListener('click', async () => {
         const errorDiv = document.getElementById('error-message');
         const btn = document.getElementById('continue-btn');
@@ -28,10 +59,10 @@
         btn.disabled = true;
         btn.textContent = 'Checking...';
 
-        const user = firebase.auth().currentUser;
+        const user = await currentUserReady();
         if (!user) {
             // User opened the verification link in a different tab — send them to login
-            window.location.href = "{{ url_for('auth.login') }}";
+            window.location.href = LOGIN_URL;
             return;
         }
 
@@ -60,12 +91,28 @@
 
     document.getElementById('resend-link').addEventListener('click', async (e) => {
         e.preventDefault();
-        const user = firebase.auth().currentUser;
-        if (user) {
+        const link = document.getElementById('resend-link');
+        link.textContent = 'Sending...';
+
+        const user = await currentUserReady();
+        if (!user) {
+            window.location.href = LOGIN_URL;
+            return;
+        }
+
+        // A resend that fails silently looks identical to one that was delivered and
+        // filtered, so the failure is always reported and always shown.
+        try {
             await user.sendEmailVerification();
-            alert('Verification email resent. Please check your inbox.');
-        } else {
-            window.location.href = "{{ url_for('auth.login') }}";
+            showResendStatus('Verification email resent. Please check your inbox and spam folder.', false);
+        } catch (err) {
+            await reportEmailFailure(user, err);
+            const detail = err.code === 'auth/too-many-requests'
+                ? 'Too many attempts — wait a few minutes before trying again.'
+                : (err.message || 'Unknown error.');
+            showResendStatus('Could not send the verification email. ' + detail, true);
+        } finally {
+            link.textContent = 'Resend verification email';
         }
     });
 </script>

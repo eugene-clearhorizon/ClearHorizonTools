@@ -13,4 +13,38 @@
             el.style.display = el.id === id ? 'block' : 'none';
         });
     }
+
+    // firebase.auth() restores the signed-in user asynchronously, so currentUser
+    // can still be null for a moment after a page load. Resolves once that first
+    // check has settled, rather than reading currentUser and guessing.
+    function currentUserReady() {
+        return new Promise(resolve => {
+            const unsubscribe = firebase.auth().onAuthStateChanged(user => {
+                unsubscribe();
+                resolve(user);
+            });
+        });
+    }
+
+    // Reports a failed verification-email send to the server so it reaches the
+    // application logs. The account exists by this point, so without this the
+    // failure never leaves the user's own browser console. Never throws — a
+    // reporting problem must not mask the send failure it is reporting.
+    async function reportEmailFailure(user, err) {
+        console.error('sendEmailVerification failed:', err);
+        try {
+            const idToken = await user.getIdToken();
+            await fetch("{{ url_for('auth.report_email_failure') }}", {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    idToken,
+                    code: err.code || '',
+                    message: err.message || ''
+                })
+            });
+        } catch (reportErr) {
+            console.error('Could not report the send failure:', reportErr);
+        }
+    }
 </script>

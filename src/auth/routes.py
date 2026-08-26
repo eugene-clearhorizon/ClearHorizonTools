@@ -1,9 +1,16 @@
 from firebase_admin import auth as firebase_auth
-from flask import Blueprint, redirect, render_template, request, session, url_for, jsonify
+from flask import Blueprint, current_app, redirect, render_template, request, session, url_for, jsonify
 
 from src.auth import ALLOWED_DOMAIN
 
 auth_bp = Blueprint('auth', __name__, url_prefix='/auth')
+
+
+def _clean(value, limit=300):
+    """Flatten client-supplied text so it can't forge extra lines in the log."""
+    if not isinstance(value, str):
+        return ''
+    return value.replace('\r', ' ').replace('\n', ' ')[:limit]
 
 
 @auth_bp.route('/login', methods=['GET'])
@@ -77,19 +84,73 @@ def check_verification():
     return jsonify({'redirect': url_for('index')}), 200
 
 
+@auth_bp.route('/report-email-failure', methods=['POST'])
+def report_email_failure():
+    """
+    Called by the client when sendEmailVerification() throws.
+
+    By that point the account already exists in Firebase, so a send failure is
+    invisible from the server: the user shows up under Authentication but never
+    receives anything. Logging it here is what makes those two cases — "Firebase
+    refused to send" versus "the mail was sent and something downstream ate it" —
+    tellable apart. The email is read from the verified token rather than the
+    request body so this endpoint can't be used to write arbitrary log entries.
+    """
+    data = request.get_json(silent=True) or {}
+    id_token = data.get('idToken')
+    if not id_token:
+        return jsonify({'error': 'Missing idToken'}), 400
+
+    try:
+        decoded = firebase_auth.verify_id_token(id_token)
+    except Exception as e:
+        current_app.logger.warning('Unverifiable token on email-failure report: %s', e)
+        return jsonify({'error': 'Token verification failed'}), 401
+
+    current_app.logger.error(
+        'VERIFICATION EMAIL SEND FAILED uid=%s email=%s code=%s message=%s',
+        decoded.get('uid'),
+        decoded.get('email'),
+        _clean(data.get('code')),
+        _clean(data.get('message')),
+    )
+    return jsonify({'status': 'logged'}), 200
+
+
 @auth_bp.route('/verify-email', methods=['GET'])
 def verify_email():
     return render_template('verify_email.html')
 
 
+@auth_bp.route('/action', methods=['GET'])
+def action():
+    """
+    Single landing page for every Firebase email action.
+
+    Firebase allows one action URL per project and distinguishes the email types
+    by a ?mode= parameter, so verification, password reset and email recovery all
+    arrive here and are dispatched client-side. Set the action URL in Firebase
+    Console -> Authentication -> Templates to point at this route.
+    """
+    return render_template('action.html')
+
+
+def _redirect_to_action():
+    """Forward a legacy per-mode URL to /auth/action, oobCode and mode intact."""
+    return redirect(url_for('auth.action', **request.args.to_dict(flat=True)))
+
+
+# The action URL used to point at one of these two, which meant links for the
+# other mode were silently bounced to the sign-in page. They are kept only so
+# that links already sitting in people's inboxes continue to work.
 @auth_bp.route('/verify-action', methods=['GET'])
 def verify_action():
-    return render_template('verify_action.html')
+    return _redirect_to_action()
 
 
 @auth_bp.route('/reset-action', methods=['GET'])
 def reset_action():
-    return render_template('reset_action.html')
+    return _redirect_to_action()
 
 
 @auth_bp.route('/logout', methods=['POST'])

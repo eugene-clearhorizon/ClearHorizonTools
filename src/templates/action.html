@@ -1,0 +1,186 @@
+{% extends "base.html" %}
+
+{% block title %}Account Action — Internal Tools{% endblock %}
+
+{% block header %}
+<div class="header">
+    <h1 id="page-heading">Just a moment&hellip;</h1>
+</div>
+{% endblock %}
+
+{% block content %}
+{#
+   One handler for every Firebase email action.
+
+   Firebase allows a single action URL per project and appends ?mode=... to it, so
+   every email template — verification, password reset, email recovery — arrives
+   here. Splitting this across per-mode routes cannot work: whichever route the
+   console points at, the other modes land on a page that rejects them.
+#}
+<div class="auth-form">
+    <div class="js-state" id="state-loading">
+        <p>Checking your link&hellip;</p>
+    </div>
+
+    <div class="js-state" id="state-verified" style="display:none;">
+        <div class="flash success">Your email has been verified.</div>
+        <a href="{{ url_for('auth.login') }}" class="btn btn-block">Sign in</a>
+    </div>
+
+    <div class="js-state" id="state-already-verified" style="display:none;">
+        <div class="flash success">Your email is already verified.</div>
+        <a href="{{ url_for('auth.login') }}" class="btn btn-block">Sign in</a>
+    </div>
+
+    <div class="js-state" id="state-reset-form" style="display:none;">
+        <p class="form-note" id="reset-email-label"></p>
+        <div id="error-message" class="flash error" style="display:none;"></div>
+        <form id="reset-form">
+            <div class="form-group">
+                <label for="new-password">New password</label>
+                <input type="password" id="new-password" required minlength="8" autocomplete="new-password">
+            </div>
+            <div class="form-group">
+                <label for="confirm-password">Confirm new password</label>
+                <input type="password" id="confirm-password" required minlength="8" autocomplete="new-password">
+            </div>
+            <button type="submit" class="btn" id="submit-btn">Set new password</button>
+        </form>
+    </div>
+
+    <div class="js-state" id="state-reset-success" style="display:none;">
+        <div class="flash success">Your password has been reset.</div>
+        <a href="{{ url_for('auth.login') }}" class="btn btn-block">Sign in</a>
+    </div>
+
+    <div class="js-state" id="state-recovered" style="display:none;">
+        <div class="flash success">Your email address has been restored.</div>
+        <p>If you didn&rsquo;t request this change, reset your password now to secure the account.</p>
+        <a href="{{ url_for('auth.login') }}" class="btn btn-block">Sign in</a>
+    </div>
+
+    <div class="js-state" id="state-error" style="display:none;">
+        <div class="flash error" id="fatal-error-message"></div>
+        <a href="{{ url_for('auth.login') }}" class="btn btn-block">Back to sign in</a>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{% include 'partials/firebase_init.html' %}
+<script>
+    const LOGIN_URL = "{{ url_for('auth.login') }}";
+    const params = new URLSearchParams(window.location.search);
+    const mode = params.get('mode');
+    const oobCode = params.get('oobCode');
+
+    function setHeading(text) {
+        document.getElementById('page-heading').textContent = text;
+    }
+
+    function fail(message) {
+        document.getElementById('fatal-error-message').textContent = message;
+        showState('state-error');
+    }
+
+    function handleVerifyEmail() {
+        setHeading('Email Verification');
+        firebase.auth().applyActionCode(oobCode)
+            .then(() => showState('state-verified'))
+            .catch(async err => {
+                if (err.code !== 'auth/invalid-action-code') {
+                    fail('Verification failed: ' + (err.message || 'unknown error'));
+                    return;
+                }
+                // Already-used and expired links report the same code, so ask
+                // Firebase what the account's actual state is before blaming the link.
+                const user = await currentUserReady();
+                if (!user) {
+                    showState('state-already-verified');
+                    return;
+                }
+                await user.reload();
+                if (firebase.auth().currentUser.emailVerified) {
+                    showState('state-already-verified');
+                } else {
+                    fail('This verification link has expired. Please request a new one.');
+                }
+            });
+    }
+
+    function handleResetPassword() {
+        setHeading('Reset Password');
+        firebase.auth().verifyPasswordResetCode(oobCode)
+            .then(email => {
+                document.getElementById('reset-email-label').textContent = 'Resetting password for ' + email;
+                showState('state-reset-form');
+            })
+            .catch(() => fail(
+                'This password reset link has expired or already been used. ' +
+                'Please request a new one from the sign-in page.'
+            ));
+
+        document.getElementById('reset-form').addEventListener('submit', async e => {
+            e.preventDefault();
+            const newPassword = document.getElementById('new-password').value;
+            const confirmPassword = document.getElementById('confirm-password').value;
+            const errorDiv = document.getElementById('error-message');
+            const submitBtn = document.getElementById('submit-btn');
+
+            errorDiv.style.display = 'none';
+
+            if (newPassword !== confirmPassword) {
+                errorDiv.textContent = 'Passwords do not match.';
+                errorDiv.style.display = 'block';
+                return;
+            }
+
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Saving...';
+
+            try {
+                await firebase.auth().confirmPasswordReset(oobCode, newPassword);
+                showState('state-reset-success');
+            } catch (err) {
+                let message = 'Failed to reset password. Please try again.';
+                if (err.code === 'auth/weak-password') {
+                    message = 'Password must be at least 8 characters.';
+                } else if (err.code === 'auth/invalid-action-code') {
+                    message = 'This reset link has expired. Please request a new one.';
+                }
+                errorDiv.textContent = message;
+                errorDiv.style.display = 'block';
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Set new password';
+            }
+        });
+    }
+
+    function handleRecoverEmail() {
+        setHeading('Restore Email Address');
+        firebase.auth().applyActionCode(oobCode)
+            .then(() => showState('state-recovered'))
+            .catch(() => fail(
+                'This link has expired or already been used. Please contact IT for help ' +
+                'restoring your email address.'
+            ));
+    }
+
+    if (!oobCode) {
+        // Someone reached this page without a link — nothing to act on.
+        window.location.href = LOGIN_URL;
+    } else if (mode === 'verifyEmail') {
+        handleVerifyEmail();
+    } else if (mode === 'resetPassword') {
+        handleResetPassword();
+    } else if (mode === 'recoverEmail') {
+        handleRecoverEmail();
+    } else {
+        // A mode Firebase supports but this app doesn't handle yet. Say so rather
+        // than bouncing to login, which is what silently swallowed verification
+        // links when each mode had its own route.
+        setHeading('Unsupported Link');
+        fail('This link type (' + (mode || 'unknown') + ') is not supported. Please contact IT.');
+    }
+</script>
+{% endblock %}

@@ -50,10 +50,13 @@
         submitBtn.disabled = true;
         submitBtn.textContent = 'Creating account...';
 
+        // Creating the account and sending the verification email are two separate
+        // failures with two separate remedies, so they are caught separately. Rolling
+        // them together is what made "the user is in Firebase but got no email" so
+        // hard to read: it surfaced as a signup error even though signup succeeded.
+        let userCredential;
         try {
-            const userCredential = await firebase.auth().createUserWithEmailAndPassword(email, password);
-            await userCredential.user.sendEmailVerification();
-            window.location.href = "{{ url_for('auth.verify_email') }}";
+            userCredential = await firebase.auth().createUserWithEmailAndPassword(email, password);
         } catch (err) {
             let message = err.message;
             if (err.code === 'auth/email-already-in-use') {
@@ -67,6 +70,19 @@
             errorDiv.style.display = 'block';
             submitBtn.disabled = false;
             submitBtn.textContent = 'Create Account';
+            return;
+        }
+
+        // The account now exists. Whatever happens next, the user belongs on the
+        // verify page — but it needs to know whether an email actually went out,
+        // so it doesn't tell them to check an inbox nothing was sent to.
+        const verifyUrl = "{{ url_for('auth.verify_email') }}";
+        try {
+            await userCredential.user.sendEmailVerification();
+            window.location.href = verifyUrl;
+        } catch (err) {
+            await reportEmailFailure(userCredential.user, err);
+            window.location.href = verifyUrl + '?send=failed';
         }
     });
 </script>
