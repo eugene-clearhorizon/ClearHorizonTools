@@ -62,3 +62,10 @@ def process_vtt_to_docx(file, output_filename):
         paragraph.add_run(combined_text.strip() + " ")
 
     doc.save(output_filename)
+
+    # Returned for usage stats. Both values are already computed above for the
+    # document header, so this costs nothing beyond handing them back.
+    return {
+        'duration_seconds': interview_length_seconds,
+        'speaker_count': len(speaker_names),
+    }

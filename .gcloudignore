@@ -17,3 +17,10 @@ __pycache__/
 # Runtime scratch dirs (recreated per request)
 uploads/
 output/
+
+# Local-only planning notes
+FUTURE_ITERATIONS.md
+
+# Dev-only, not needed in the container
+scripts/
+firestore.rules

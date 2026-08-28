@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, request, send_from_directory, after_this_request, flash
+from flask import Blueprint, g, render_template, request, send_from_directory, after_this_request, flash
 from werkzeug.utils import secure_filename
 import os
 import uuid
@@ -6,6 +6,7 @@ import zipfile
 import shutil
 from .utils import process_vtt_to_docx
 from src.auth.utils import login_required
+from src.stats import record_run
 
 transcript_cleaner_bp = Blueprint('transcript_cleaner', __name__, template_folder='../templates')
 
@@ -50,6 +51,7 @@ def transcript_cleaner():
             return render_template('transcript_cleaner.html')
 
         output_paths = []
+        total_duration_seconds = 0.0
 
         for file in valid_files:
             filename = secure_filename(file.filename)
@@ -60,7 +62,20 @@ def transcript_cleaner():
             output_filepath = os.path.join(output_dir, output_filename)
             output_paths.append(output_filepath)
 
-            process_vtt_to_docx(filepath, output_filepath)
+            result = process_vtt_to_docx(filepath, output_filepath)
+            total_duration_seconds += result['duration_seconds']
+
+        # Recorded here, after every file has converted, so the count only ever
+        # reflects transcripts the user actually received. Synchronous on purpose:
+        # Cloud Run throttles CPU once the response is sent, so deferring this to
+        # a background thread would mean losing writes. See src/stats.
+        record_run(
+            event_id=request_id,
+            tool='transcript_cleaner',
+            uid=g.user.get('uid'),
+            file_count=len(valid_files),
+            duration_seconds=total_duration_seconds,
+        )
 
         if len(output_paths) == 1:
             return send_from_directory(

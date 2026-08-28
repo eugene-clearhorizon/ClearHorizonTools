@@ -17,3 +17,6 @@ __pycache__/
 # Temp file processing directories
 uploads/
 output/
+
+# Local-only planning notes (not for GitHub)
+FUTURE_ITERATIONS.md

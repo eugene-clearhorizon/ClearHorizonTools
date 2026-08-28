@@ -1,0 +1,20 @@
+// Firestore security rules for the clear-horizon-tools project.
+//
+// Paste these into Firebase Console -> Firestore Database -> Rules, then Publish.
+//
+// Deny everything. The app writes usage stats through the Firebase Admin SDK,
+// which bypasses these rules entirely, so locking the database down costs the app
+// nothing and stops any browser — signed in or not — from reading usage data.
+//
+// If a client ever legitimately needs to read a collection, add a rule for that
+// collection specifically. Do not loosen this catch-all.
+
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

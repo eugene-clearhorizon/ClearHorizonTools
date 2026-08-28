@@ -58,9 +58,57 @@ gitignored, and the Firebase credentials in it are as good as a password.
 | `FIREBASE_AUTH_DOMAIN` | Firebase Console → Project Settings → General (looks like `your-project.firebaseapp.com`) |
 | `FIREBASE_PROJECT_ID` | Firebase Console → Project Settings → General |
 
+There is one optional variable:
+
+| Variable | Purpose |
+|---|---|
+| `STATS_SALT` | Salt for the anonymous usage-stats hash. Defaults to `SECRET_KEY`, which is fine — set it only if you plan to rotate `SECRET_KEY` and want distinct-user counts to stay comparable across the rotation. |
+
 Setting Firebase up from scratch — enabling email sign-in, authorising the domain,
 generating the service account key — is a separate one-time job. See
 [FIREBASE_SETUP.md](FIREBASE_SETUP.md).
+
+## Usage stats
+
+The app records how much work it does, so we can answer "how much is this actually being
+used" without guessing. Each successful run writes one document to the `usage_events`
+collection in Firestore, in the `clear-horizon-tools` project.
+
+**It is deliberately anonymous.** A run records the number of transcripts, their total
+duration, and a one-way HMAC of the user's Firebase UID — no UID, no email, no filenames,
+and nothing derived from transcript content. That means you can ask *how many people* used
+the tool in a given month, but not *which people*, and the hash cannot be reversed to find
+out. This was a deliberate choice, not an oversight: on a team this size, per-person counts
+amount to individual productivity monitoring.
+
+The unit counted is one `.vtt` file converted, not one form submission — people routinely
+upload several at once, so counting requests would undercount badly.
+
+To read the numbers:
+
+```powershell
+.\.venv\Scripts\python.exe scripts\usage_report.py
+```
+
+It prints all-time totals, a month-by-month breakdown, and a per-tool split, using the
+credentials in your `.env`. Monthly user counts are not additive — someone active in two
+months appears in both.
+
+### One-time setup
+
+If Firestore has never been enabled on the Firebase project:
+
+1. Firebase Console → Firestore Database → Create database, **Native mode**, region
+   `australia-southeast2`. **The region is permanent and cannot be changed later.**
+2. Firestore Database → Rules → paste [firestore.rules](firestore.rules) → Publish. It
+   denies all client access. The app writes through the Admin SDK, which bypasses rules
+   entirely, so this costs the app nothing and stops any browser reading usage data.
+
+No new environment variables and no new dependency are required —
+`google-cloud-firestore` already ships with `firebase-admin`.
+
+Until Firestore exists the app still works normally; stats writes fail, get logged as a
+warning, and are dropped. A stats failure never costs a user their download.
 
 ## Hosting and ownership
 
