@@ -3,7 +3,7 @@ import os
 
 import firebase_admin
 from firebase_admin import credentials
-from flask import Flask, render_template
+from flask import Flask, render_template, send_from_directory
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -40,6 +40,13 @@ def inject_firebase_config():
         'firebase_project_id': os.environ.get('FIREBASE_PROJECT_ID', ''),
         'allowed_domain': ALLOWED_DOMAIN,
     }
+
+
+@app.route('/favicon.ico')
+def favicon():
+    # Browsers request this at the root regardless of the <link> tag; serving it
+    # here keeps Cloud Run request logs free of 404 warnings.
+    return send_from_directory(app.static_folder, 'favicon.ico', mimetype='image/vnd.microsoft.icon')
 
 
 @app.route('/')
