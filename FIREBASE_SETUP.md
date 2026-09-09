@@ -140,6 +140,39 @@ Wrong API key or auth domain, or the web app was never registered. Re-check step
 **"Domain not authorized" from the Firebase JS SDK**
 The Cloud Run domain isn't in Authorized Domains. Re-check step 3.
 
+**Someone signed up but the verification email never arrived — unblock them by hand**
+
+This is the accepted process, not a hack of last resort. Delivery of Firebase's default
+sender into the Clear Horizon tenant is unreliable (see the entry below), and at roughly
+one signup a month it is not worth building email infrastructure to fix. So we unblock
+people manually.
+
+```powershell
+.venv\Scripts\python.exe scripts/admin_users.py list
+.venv\Scripts\python.exe scripts/admin_users.py verify someone@clearhorizon.com.au
+```
+
+`list` shows every account and whether it is verified. `verify` marks the address verified
+without an email round-trip, after asking you to retype it. There is also:
+
+```powershell
+.venv\Scripts\python.exe scripts/admin_users.py link someone@clearhorizon.com.au
+```
+
+which mints a fresh verification link and prints it instead of emailing it — send it over
+Teams and let them click it themselves. Use `link` when you want them to complete the real
+flow, `verify` when you just need them working.
+
+Both refuse addresses outside `@clearhorizon.com.au`, so this cannot be used to admit
+someone the signup page would have turned away. What it does give up is the proof that the
+person controls the mailbox, so only run it for someone whose identity you already know —
+in practice, everyone, since accounts are only ever created for staff.
+
+You cannot look up the code from an email that was already sent. Firebase keeps only a
+hash of the outstanding `oobCode` and never exposes it. Mint a new link instead.
+
+Needs `FIREBASE_CREDENTIALS_JSON` in `.env` — the same service account the app uses.
+
 **Clicking the verification link just lands on the sign-in page, and the account stays unverified**
 
 The action URL is pointing at a per-mode route instead of `/auth/action`. The link carries
