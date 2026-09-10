@@ -11,16 +11,25 @@
 {% block content %}
 <div class="auth-form">
     <div id="sent-message">
-        <p>A verification email has been sent to your address. Please check your inbox (and spam folder) and click the link to verify.</p>
-        <p>Once verified, click below to continue.</p>
+        <p>A verification email has been sent to your address. Click the link in it to
+        verify, then come back here.</p>
+        <div class="flash warning">
+            <p><strong>Not in your inbox?</strong> It usually lands in Junk, and is
+            sometimes held in quarantine, where you have to release it yourself before it
+            will appear. Check both.</p>
+            <p>If it doesn&rsquo;t turn up at all, email
+            <a href="mailto:{{ support_contact_email }}">{{ support_contact_name }}</a> and
+            he can verify your account for you.</p>
+        </div>
     </div>
     <div id="send-failed" style="display:none;">
         <div class="flash error">
             Your account was created, but we couldn&rsquo;t send the verification email.
             Nothing has arrived in your inbox &mdash; there is no point waiting for it.
         </div>
-        <p>Try &ldquo;Resend&rdquo; below. If that fails too, the problem is at our end: contact IT
-        and mention that the verification email could not be sent.</p>
+        <p>Try &ldquo;Resend&rdquo; below. If that fails too, the problem is at our end &mdash;
+        email <a href="mailto:{{ support_contact_email }}">{{ support_contact_name }}</a> and
+        mention that the verification email could not be sent.</p>
     </div>
     <div id="error-message" class="flash error" style="display:none;"></div>
     <div id="resend-status" style="display:none;"></div>

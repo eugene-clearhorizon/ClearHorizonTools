@@ -158,6 +158,14 @@ body {
     box-sizing: border-box;
 }
 
+.flash p {
+    margin: 0 0 0.75rem 0;
+}
+
+.flash p:last-child {
+    margin-bottom: 0;
+}
+
 .flash.error {
     background-color: #f8d7da;
     color: #721c24;

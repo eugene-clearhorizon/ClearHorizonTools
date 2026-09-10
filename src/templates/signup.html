@@ -11,6 +11,14 @@
 
 {% block content %}
 <div class="auth-form">
+    <div class="flash warning">
+        <p><strong>The verification email usually lands in Junk</strong>, and is sometimes
+        held in quarantine, where you have to release it yourself before it will appear.
+        Check both.</p>
+        <p>If it doesn&rsquo;t turn up at all, email
+        <a href="mailto:{{ support_contact_email }}">{{ support_contact_name }}</a> and
+        he can verify your account for you.</p>
+    </div>
     <div id="error-message" class="flash error" style="display:none;"></div>
     <form id="signup-form">
         <div class="form-group">

@@ -8,7 +8,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-from src.auth import ALLOWED_DOMAIN
+from src.auth import ALLOWED_DOMAIN, SUPPORT_CONTACT_EMAIL, SUPPORT_CONTACT_NAME
 from src.auth.routes import auth_bp
 from src.auth.utils import login_required
 from src.transcript_cleaner.routes import transcript_cleaner_bp
@@ -39,6 +39,8 @@ def inject_firebase_config():
         'firebase_auth_domain': os.environ.get('FIREBASE_AUTH_DOMAIN', ''),
         'firebase_project_id': os.environ.get('FIREBASE_PROJECT_ID', ''),
         'allowed_domain': ALLOWED_DOMAIN,
+        'support_contact_name': SUPPORT_CONTACT_NAME,
+        'support_contact_email': SUPPORT_CONTACT_EMAIL,
     }
 
 
