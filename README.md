@@ -92,7 +92,59 @@ To read the numbers:
 
 It prints all-time totals, a month-by-month breakdown, and a per-tool split, using the
 credentials in your `.env`. Monthly user counts are not additive — someone active in two
-months appears in both.
+months appears in both. Months are Melbourne calendar months, not UTC ones.
+
+### Monthly usage email
+
+At 8am Melbourne time on the 1st of each month, an email reports on the transcript
+cleaner for the month just ended: runs, transcripts, hours processed and unique users,
+each with the change on the month before, then a bar chart of each by month (up to the
+last 12).
+
+It is a Cloud Run **job** called `usage-email`, separate from the web service, started by
+a Cloud Scheduler trigger called `usage-email-monthly`. Both live in `evaluation-tools`.
+The code is [src/stats/monthly_email.py](src/stats/monthly_email.py).
+
+Mail goes out through Mailgun or SendGrid, set by these values in `.env`:
+
+| Variable | Purpose |
+|---|---|
+| `USAGE_EMAIL_TO` | Recipients, comma-separated |
+| `USAGE_EMAIL_FROM` | Sender, e.g. `Clear Horizon Tools <usage@your-mailgun-domain>`. Must be an address the provider lets you send from. |
+| `MAILGUN_API_KEY`, `MAILGUN_DOMAIN` | Mailgun's sending key and domain. EU-region accounts also need `MAILGUN_API_BASE=https://api.eu.mailgun.net`. |
+| `SENDGRID_API_KEY` | Used only if no Mailgun key is set |
+
+To see the email without sending it:
+
+```powershell
+.\.venv\Scripts\python.exe -m src.stats.monthly_email --preview output\usage_email
+```
+
+then open `output\usage_email\email.html`. Add `--month 2026-09` to report on a specific
+month. Leave off `--preview` and it sends for real.
+
+To deploy, or to redeploy after changing the email code or its settings in `.env`:
+
+```powershell
+.\deploy_usage_email.ps1
+```
+
+**Pushing to `main` does not update this job.** The Cloud Build trigger only rebuilds the
+web service, so the job keeps running the code from whenever the script was last run. The
+script copies the email settings and `FIREBASE_CREDENTIALS_JSON` from your `.env` into the
+job's environment variables. That means they are visible, like the web service's, to
+anyone with access to the project.
+
+To send one now, check whether the last run worked, or pause the schedule:
+
+```powershell
+gcloud run jobs execute usage-email --project evaluation-tools --region australia-southeast2 --wait
+gcloud run jobs executions list --job usage-email --project evaluation-tools --region australia-southeast2
+gcloud scheduler jobs pause usage-email-monthly --project evaluation-tools --location australia-southeast1
+```
+
+A failed run retries once, then shows as failed in the Cloud Run console under Jobs.
+Nothing alerts you, so a month with no email means it is time to check there.
 
 ### One-time setup
 

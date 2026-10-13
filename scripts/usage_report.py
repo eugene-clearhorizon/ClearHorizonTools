@@ -11,7 +11,6 @@ per month. If this ever gets slow, that's a good problem and the fix is a
 per-month aggregation query.
 """
 
-import json
 import os
 import sys
 from collections import defaultdict
@@ -22,10 +21,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-import firebase_admin
-from firebase_admin import credentials, firestore
-
-from src.stats import COLLECTION
+from src.stats.report import by_month, firestore_client, successful_events
 
 
 def _hours(seconds):
@@ -33,27 +29,20 @@ def _hours(seconds):
 
 
 def main():
-    creds_json = os.environ.get('FIREBASE_CREDENTIALS_JSON')
-    if not creds_json:
+    if not os.environ.get('FIREBASE_CREDENTIALS_JSON'):
         sys.exit('FIREBASE_CREDENTIALS_JSON is not set. Copy .env.example to .env and fill it in.')
 
-    firebase_admin.initialize_app(credentials.Certificate(json.loads(creds_json)))
-    db = firestore.client()
-
-    events = [doc.to_dict() for doc in db.collection(COLLECTION).stream()]
-    events = [e for e in events if e.get('outcome') == 'success']
+    events = successful_events(firestore_client())
 
     if not events:
         print('No usage events recorded yet.')
         return
 
-    by_month = defaultdict(lambda: {'runs': 0, 'files': 0, 'seconds': 0, 'users': set()})
+    months, undated = by_month(events)
     by_tool = defaultdict(lambda: {'runs': 0, 'files': 0, 'seconds': 0})
     all_users = set()
-    undated = 0
 
     for e in events:
-        ts = e.get('timestamp')
         files = e.get('file_count', 0)
         seconds = e.get('duration_seconds', 0)
         user = e.get('user_hash')
@@ -65,19 +54,6 @@ def main():
 
         if user:
             all_users.add(user)
-
-        if ts is None:
-            # A server timestamp is null for the instant between the write landing
-            # and the server stamping it. Count it in the totals, not the months.
-            undated += 1
-            continue
-
-        month = by_month[ts.strftime('%Y-%m')]
-        month['runs'] += 1
-        month['files'] += files
-        month['seconds'] += seconds
-        if user:
-            month['users'].add(user)
 
     total_files = sum(t['files'] for t in by_tool.values())
     total_seconds = sum(t['seconds'] for t in by_tool.values())
@@ -93,10 +69,10 @@ def main():
     print(f'  Distinct users:    {len(all_users):>8,}')
     print()
 
-    print('BY MONTH')
+    print('BY MONTH (Melbourne time)')
     print(f'  {"Month":<9} {"Runs":>6} {"Transcripts":>12} {"Hours":>8} {"Users":>6}')
-    for month in sorted(by_month):
-        m = by_month[month]
+    for month in sorted(months):
+        m = months[month]
         print(f'  {month:<9} {m["runs"]:>6,} {m["files"]:>12,} '
               f'{_hours(m["seconds"]):>8,.1f} {len(m["users"]):>6,}')
     print()
@@ -109,7 +85,8 @@ def main():
     print()
 
     print('Note: "Users" counts distinct anonymous hashes, so it answers "how many')
-    print('people" but never "which people". Monthly figures are not additive —')
+    # Plain ASCII only: the Windows console codepage mangles an em dash here.
+    print('people" but never "which people". Monthly figures are not additive -')
     print('someone active in two months is counted in both.')
     if undated:
         print(f'Note: {undated} event(s) had no server timestamp yet and are in the')
