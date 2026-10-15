@@ -1,6 +1,7 @@
 import os
 import webvtt
 from docx import Document
+from docx.shared import Pt
 
 def format_duration(seconds):
     hours = int(seconds // 3600)
@@ -52,7 +53,8 @@ def process_vtt_to_docx(file, output_filename):
                 paragraph.add_run(combined_text + " ")
                 combined_text = ""
             if last_speaker is not None:
-                paragraph.add_run("\n\n")
+                paragraph = doc.add_paragraph()
+                paragraph.paragraph_format.space_before = Pt(12)
             paragraph.add_run(f"{speaker_name}: ").bold = True
             last_speaker = speaker_name
         
